@@ -1,9 +1,39 @@
 #Import data
 Xtrain <- read.csv("C:/Users/yuan/src/CountableCare/Data/TrainValue.csv")
 Ytrain <- read.csv("C:/Users/yuan/src/CountableCare/Data/TrainLabel.csv")
-Xtest <- read.csv("C:/Users/yuan/src/CountableCare/Data/TestValue.csv")
+Xtest <- read.csv("/C:/Users/yuan/src/CountableCare/Data/TestValue.csv")
 
-#Algorithms:
+#Introduce NA's for white spaces in categorical data:
+Xtrain[Xtrain==""] <- NA
+
+#Take a loot into NA's
+vec=rep(0, ncol(Xtrain))
+for (i in 1:ncol(Xtrain)){
+  vec[i] = sum(is.na(Xtrain[,i]))
+}
+plot(1:1379, vec, type="h",  col="red")
+abline(v=118, col="blue", lwd=3)
+abline(v=329, col="blue",lwd=3)
+
+hist(vec)
+#Most of the columns are mostly NA's...
+
+##Get rid of columns with more than 50%(TBA) NA's:
+ind = apply(Xtrain, 2, function(x) {sum(is.na(x)) > 0.5*length(x)})
+col_ind = c(1:ncol(Xtrain))[ind]
+length(col_ind)
+# 1159 such columns will be removed.
+sum(col_ind <= 118)
+# 93 out of 116 numeric are invalid.
+sum(col_ind > 118 & col_ind <= 329)
+# 194 out of 210 ordinal are invalid.
+sum(col_ind > 329)
+# 872 out of 1052 categorical are invalid.
+
+#To combine what's left:
+X = cbind(Ytrain[,-1], Xtrain[,-c(1,2,col_ind)])
+
+######Algorithms:
 ols = function(Xtrain, Ytrain, Xtest)
 {
   betahat = solve(t(Xtrain)%*%Xtrain)%*%t(Xtrain)%*%Ytrain
@@ -48,9 +78,3 @@ ridgeregression = function(Xtrain, Ytrain, Xtest, lambda)
   Yhat = Xtest %*% betahat
   return (Yhat)
 }
-
-#play
-Xtest = as.matrix(Xtest)
-Xtrain = as.matrix(Xtrain)
-Ytrain = as.matrix(Ytrain)
-Y_ols = ols(Xtrain, Ytrain, Xtest)
