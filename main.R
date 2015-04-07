@@ -16,6 +16,7 @@ abline(v=118, col="blue", lwd=3)
 abline(v=329, col="blue",lwd=3)
 
 hist(vec)
+sum(is.na(Xtrain))/(ncol(Xtrain)*nrow(Xtrain))
 #Most of the columns are mostly NA's...
 
 ##Get rid of columns with more than 50%(TBA) NA's:
@@ -31,50 +32,78 @@ sum(col_ind > 329)
 # 872 out of 1052 categorical are invalid.
 
 #To combine what's left:
-X = cbind(Ytrain[,-1], Xtrain[,-c(1,2,col_ind)])
+X = cbind(Ytrain[,-1], Xtrain[,-c(1,col_ind)])
 
-######Algorithms:
-ols = function(Xtrain, Ytrain, Xtest)
-{
-  betahat = solve(t(Xtrain)%*%Xtrain)%*%t(Xtrain)%*%Ytrain
-  Yhat = Xtest %*% betahat
-  return (Yhat)
+#Deal with numeric missing values:
+num = grep("n_", colnames(X))
+for (i in 1:nrow(X)) {
+X[i, num] <- ifelse(is.na(X[i, num]), 0, X[i, num])}
+
+#Deal with ordinal missing values:
+ord = grep("o_", colnames(X))
+for (i in 1:nrow(X)) {
+  X[i, ord] <- ifelse(is.na(X[i, ord]), -1, X[i, ord])}
+
+#Deal with categorical missing values:
+cat = grep("c_", colnames(X))
+for (i in 1:nrow(X)) {
+  X[i, cat] <- ifelse(is.na(X[i, cat]), "Missing", X[i, cat])}
+
+X = as.data.frame(X)
+
+#Make dummies for categorical, and release:
+train = X[,c(1:14, 16:55)]
+dum_release = model.matrix(~X[,15])
+train = cbind(train, dum_release[,-1])
+for (i in 56:233){
+  dummy = model.matrix(~X[,i])
+  train = cbind(train, dummy[,-1])
 }
 
-forward_stepwise = function(Xtrain, Ytrain, Xtest, k)  
-{
-  included_predictors = 1  ## include the intercept by default
-  for (i in 1:k)
-  {
-    potential_predictors = (1:ncol(Xtrain))[-included_predictors]
-    RSS = rep(0,length(potential_predictors))
-    for (j in 1:length(potential_predictors))
-    {
-      predictors = c(included_predictors, potential_predictors[j])
-      trainYhat = ols(Xtrain[,predictors,drop=FALSE], Ytrain, Xtrain[,predictors,drop=FALSE])
-      RSS[j] = sum((Ytrain - trainYhat)^2) 
-    }
-    best_new_predictor = potential_predictors[which(RSS == min(RSS))] ## Smallest RSS is same as biggest R^2
-    included_predictors = c(included_predictors, best_new_predictor)
-  }
-  Yhat = ols(Xtrain[,included_predictors], Ytrain, Xtest[,included_predictors])
-  return(Yhat)
+#Change to numeric matrix:
+train = as.matrix(train)
+class(train) <- "numeric"
+
+#### Now for test data:
+Xtest[Xtest==""] <- NA
+test = Xtest[,-c(1,col_ind)]
+#Deal with numeric missing values:
+num = grep("n_", colnames(test))
+for (i in 1:nrow(test)) {
+  test[i, num] <- ifelse(is.na(test[i, num]), 0, test[i, num])}
+#Deal with ordinal missing values:
+ord = grep("o_", colnames(test))
+for (i in 1:nrow(test)) {
+  test[i, ord] <- ifelse(is.na(test[i, ord]), -1, test[i, ord])}
+#Deal with categorical missing values:
+test = as.matrix(test)
+cat = grep("c_", colnames(test))
+for (i in 1:nrow(test)) {
+  test[i, cat] <- ifelse(is.na(test[i, cat]), "Missing", test[i, cat])}
+
+#Make dummies for categorical, and release:
+test = as.data.frame(test)
+x_test = test[,c(2:41)]
+dum_release = model.matrix(~test[,1])
+x_test = cbind(x_test, dum_release[,-1])
+for (i in 42:219){
+  dummy = model.matrix(~test[,i])
+  x_test = cbind(x_test, dummy[,-1])
+}
+#Change to numeric matrix:
+x_test = as.matrix(x_test)
+class(x_test) <- "numeric"
+
+###Submission format:
+write_submission <- function(probs, model_name) {
+  file_path <- file.path("submit", paste0(model_name, ".csv"))
+  submit <- read.csv("Data/SubmissionFormat.csv")
+  submit[, 2:ncol(submit)] <- probs
+  if (file.exists(file_path))
+    stop(paste0(file_path, " already exists!"))
+  write.csv(submit, file.path(file_path), row.names = FALSE)
+  message(paste0("Results written to ", file_path))
 }
 
-pcr = function(Xtrain, Ytrain, Xtest, k)  
-{
-  V = svd(Xtrain)$v[, 1:k, drop=FALSE]
-  Wtrain = Xtrain %*% V
-  betahat = solve(t(Wtrain)%*%Wtrain) %*% t(Wtrain) %*% Ytrain
-  Wtest = Xtest %*% V
-  Yhat = Wtest%*%betahat
-  return(Yhat)
-}
-
-ridgeregression = function(Xtrain, Ytrain, Xtest, lambda)
-{
-  p = ncol(Xtrain)
-  betahat = solve(t(Xtrain)%*%Xtrain + lambda*diag(p))%*%t(Xtrain)%*%Ytrain
-  Yhat = Xtest %*% betahat
-  return (Yhat)
-}
+## Source the algorithms:
+source("algorithms.R")
