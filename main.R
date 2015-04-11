@@ -140,10 +140,9 @@ result1 = result
 plot(x=1:14, y=lambdas.min, xlab="Column# in Y", ylab="Lambda.min", type="h",
      lwd=3, main="Lambdas with Smallest MSE Using Ridge_CV")
 
-result[result<0] <- 0
-result[result>1] <- 1
-result[result==0] <- 0.1
-result[result==1] <- 0.9
+result[result<0] <- 0.1
+result[result>1] <- 0.9
+
 submit <- read.csv("Data/SubmissionFormat.csv")
 submit[, 2:ncol(submit)] <- result
 write.csv(submit, "ridge0.8.csv", row.names = FALSE)
@@ -159,3 +158,13 @@ for (i in 2:15){
 
 write.csv(ridge, "ridge0.5_colmean.csv", row.names = FALSE)
 #Score: 0.5044
+
+ridge <- read.csv("C:/Users/yuan/src/CountableCare/ridge0.8.csv")
+colmean = colMeans(ytrain)
+for (i in 2:15){
+  ridge[which(ridge[,i]==0),i] <- colmean[i-1]
+  ridge[which(ridge[,i]==1),i] <- colmean[i-1]
+}
+
+write.csv(ridge, "ridge0.8_colmean.csv", row.names = FALSE)
+#Score: 0.5274
